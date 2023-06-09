@@ -1,0 +1,22 @@
+python3
+julia 1.5
+
+#packages
+numpy
+pandas
+statsmodels
+scipy
+sklearn
+tqdm
+
+#plotting
+matplotlib
+seaborn
+
+#interactive
+If you want to draw individual hex boundaries 
+on a video frame from a session of interest,
+and use these for hex-classification,
+you will need the shapely package. Otherwise,
+you can use the updated method of fitting a hex-grid
+onto an image of the maze.
