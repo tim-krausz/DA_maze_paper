@@ -134,11 +134,39 @@ def plot_individualRatRamps(hexData):
         fig.savefig(hexData.directory_prefix+"avgRampRat_"+rat+".pdf")
         plt.clf()
 
+def plot_individualRatRampsByFiber(hexData,saveFigs=True):
+    get_hexRampRatFiberDict(hexData,stHex=16)
+    fig = plt.figure(figsize=(5,4))
+    xvals = np.arange(-16,1)
+    lastrat = None
+    ratNums = {rl:'' for rl in hexData.ratFiberRamps.keys()}
+    for rloc in hexData.ratFiberRamps.keys():
+        rat = rloc.split(":")[0]
+        plt.plot(xvals,hexData.ratFiberRamps[rloc],alpha=1,lw=4)#color="darkgreen"
+        plt.fill_between(xvals,hexData.ratFiberRamps[rloc]+hexData.ratFiberRampSems[rloc],
+                        hexData.ratFiberRamps[rloc]-hexData.ratFiberRampSems[rloc],color="k",alpha=0.3)
+        plt.xlabel("Distance from port (hexes)",fontsize=20)
+        plt.ylabel("DA (z-scored)",fontsize=20)
+        ratNums[rloc] = str(hexData.ratFiberTris[rloc][0])+" sessions; "+str(hexData.ratFiberTris[rloc][1])+" trials."
+        #plt.title(str(hexData.ratFiberTris[rloc][0])+" sessions; "+str(hexData.ratFiberTris[rloc][1])+" trials.")
+        plt.tight_layout()
+        if (lastrat == rat or rat=="IM-1532") and saveFigs==True:
+            fig.savefig(hexData.directory_prefix+f"dataByRat/avgRampRatFiber_{rat}_mapDists.pdf")
+            plt.clf()
+        lastrat = rat
+    with open(hexData.directory_prefix+"rat_and_fiber_numbers.txt", 'w') as f:
+        f.write(str(ratNums))
+
 def calc_distFromOptPathLen(hexData):
     dfopt = []
     for s in hexData.df.session.unique():
-        sdat = hexData.df.loc[hexData.df.session==s]
+        sdat = hexData.df.loc[hexData.df.session==s,:].copy()
         svisinds = sdat.loc[sdat.port!=-100].index
+        dropInds = svisinds[:-1][sdat.loc[svisinds[:-1]+1,'hexlabel'].isin([1,2,3]).values]+1
+        if len(dropInds)>0:
+            sdat.drop(dropInds,axis=0,inplace=True)
+            sdat.reset_index(inplace=True)
+            svisinds = sdat.loc[sdat.port!=-100].index
         optlengths = sdat.loc[svisinds,'dtop'].values
         if sdat.index.min()==svisinds[0]:
             takenlengths = np.diff(np.concatenate([[svisidns[0]-1],svisinds]))
@@ -150,7 +178,7 @@ def calc_distFromOptPathLen(hexData):
     hexData.df.loc[:,'d_from_opt_len']=-100
     hexData.df.loc[hexData.df.port!=-100,'d_from_opt_len']=dfopt
     hexData.df.loc[:,'d_from_opt_len'] = hexData.df.d_from_opt_len.replace(-100,method='bfill')
-    hexData.df.loc[:,'d_from_opt_len']=hexData.df.d_from_opt_len.astype("int8")
+    hexData.df.loc[:,'d_from_opt_len'] = hexData.df.d_from_opt_len.astype("int8")
 
 def add_rewardLagColumns2Df(photrats,lags=5):
     for l in range(1,lags+1):
@@ -379,8 +407,7 @@ def getRwdPatternInds_longSeq(hexDf,rwd_pattern,alongPath=False,getPriorTri=True
     return rwd_pattern_inds,rat_IDs
 
 def get_NullResidualsByRwdSeq(hexData,rwd_pattern,stHex = 10,getPriorTri=True):
-    '''For each occurrance of a reward pattern, shuffle the path-run indices.
-    Fit ramp to individual traces in each shuffled pattern, subtract
+    '''Fit ramp to individusl traces in each reward pattern, subtract
     fitted ramps, and return residuals.'''
     shuff_pattern_inds,rat_IDs = getShuffledRwdPatternInds(hexData.df.copy(),rwd_pattern,getPriorTri)
     
@@ -392,7 +419,7 @@ def get_NullResidualsByRwdSeq(hexData,rwd_pattern,stHex = 10,getPriorTri=True):
             Null_residuals[e].append(calcRampResiduals(hexData,rat,trace))
     return np.mean(Null_residuals,axis=1)
 
-def getShuffledRwdPatternInds(hexDf,rwd_pattern,getPriorTri=True):
+def getShuffledRwdPatternInds(hexDf,rwd_pattern,alongPath=False,altPath=False,getPriorTri=True):
     shuffled_inds = []
     rat_IDs = []
     patLen = len(rwd_pattern)
@@ -401,23 +428,28 @@ def getShuffledRwdPatternInds(hexDf,rwd_pattern,getPriorTri=True):
             dat = hexDf.loc[(hexDf.port!=-100)&(hexDf.session==s)\
                                   &(hexDf.block==b),["port","rwd","samePath_t-1","rt-1"]].copy()
             dat.loc[:,"path"] = dat.port.astype(str)+dat.port.shift(1).fillna(-1).astype(str)
-            ps = dat.loc[(dat.path!='0.0-1.0')&(dat.path!='2-1.0')&(dat.path!='0-1.0')\
-                         &(dat.path!='1-1.0'),"path"].unique()
+            if alongPath:
+                dat.loc[:,"path"] = dat.port.astype(str)+dat.port.shift(1).fillna(-1).astype(str)
+                ps = dat.loc[(dat.path!='0.0-1.0')&(dat.path!='2-1.0')&(dat.path!='0-1.0')\
+                             &(dat.path!='1-1.0'),"path"].unique()
+            else:
+                ps = [0,1,2]
             for p in ps:
-                rwdseq = dat.loc[(dat.path==p)&(dat["samePath_t-1"]==1),"rt-1"]
+                rwdseq = dat.loc[(dat.path==p)&(dat["samePath_t-1"]==1),"rt-1"] if alongPath\
+                    else dat.loc[dat.port==p,"rt-1"]
                 if len(rwdseq)<patLen+int(getPriorTri):
                     continue
                 rwdInds = rwdseq.index.values
                 inds2check = range(len(rwdseq)-patLen)
-                shufInds = [(rwdInds[i+1-int(getPriorTri)], rwdInds[i+patLen])
+                pInds = [(rwdInds[i+1-int(getPriorTri)], rwdInds[i+patLen])
                                for i in inds2check\
                  if np.all(rwdseq.values[i+1:i+patLen+1] == rwd_pattern)]
-                if len(shufInds)>0:
-                    for r in shufInds:
-                        rseqInds = rwdseq.loc[r[0]:r[1]].index.values
-                        shuffledRseqInds = rseqInds[np.random.choice(\
-                                        np.arange(0,len(rseqInds)),patLen+int(getPriorTri),replace=False)]
-                        shuffled_inds.append(shuffledRseqInds)
+                if len(pInds)==0:
+                    continue
+                for i in range(len(pInds)):
+                    shufInds = rwdInds[np.random.choice(np.arange(0,len(rwdInds)),\
+                                                        patLen+int(getPriorTri),replace=False)]
+                    shuffled_inds.append(shufInds)
                     rat_IDs.append(hexDf.loc[hexDf.session==s,"rat"].values[0])
     return shuffled_inds,rat_IDs
 
@@ -451,6 +483,7 @@ def plotResidualsByRwdSeq(hexData,rwd_pattern,residuals,null_residuals,
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.00,bottom=0.00)
     return fig
+
 def calcRampResiduals(hexData,rat,daTrace):
     gain,icept = calcRampGain(hexData,rat,daTrace)
     return daTrace - (hexData.ratRamps[rat]*gain+icept)
@@ -623,25 +656,26 @@ def get_ratAvgEntry4Plot(ratDict,entryNum):
         ratmeans.append(np.nanmean(ratDict[rat][entryNum],axis=0))
     return np.nanmean(ratmeans,axis=0),sem(ratmeans)
 
-def plot_hexRampByPrwd(hexData,stHex=15,ylim=[-.14,.45]):
+def plot_hexRampByPrwd(hexData,stHex=15,ylim=[-.14,.45],var='DA'):
     highmeans = []
     midmeans = []
     lowmeans = []
     midTri=25
     for r in hexData.df.rat.unique():
         highmeans.append(hexData.df.loc[(hexData.df.rat==r)&(hexData.df.tri>midTri)&\
-                                         (hexData.df.nom_rwd_chosen>79),["DA","hexesFromPort"]].\
-            groupby("hexesFromPort").mean().loc[0:stHex,"DA"].values)
+                                         (hexData.df.nom_rwd_chosen>79),[var,"hexesFromPort"]].\
+            groupby("hexesFromPort").mean().loc[0:stHex,var].values)
         if len(highmeans[-1]) == 0:
             highmeans = highmeans[:-1]
         midmeans.append(hexData.df.loc[(hexData.df.rat==r)&(hexData.df.tri>midTri)&\
                                         (hexData.df.nom_rwd_chosen==50),\
-            ["DA","hexesFromPort"]].groupby("hexesFromPort").mean().loc[0:stHex,"DA"].values)
+            [var,"hexesFromPort"]].groupby("hexesFromPort").mean().loc[0:stHex,var].values)
         if len(midmeans[-1]) == 0:
             midmeans = midmeans[:-1]
         lowmeans.append(hexData.df.loc[(hexData.df.rat==r)&(hexData.df.tri>midTri)&\
-                                        (hexData.df.nom_rwd_chosen<=20)&(hexData.df.nom_rwd_chosen>=0),["DA","hexesFromPort"]].\
-            groupby("hexesFromPort").mean().loc[0:stHex,"DA"].values)
+                                        (hexData.df.nom_rwd_chosen<=20)&\
+                    (hexData.df.nom_rwd_chosen>=0),[var,"hexesFromPort"]].\
+            groupby("hexesFromPort").mean().loc[0:stHex,var].values)
         if len(lowmeans[-1]) == 0:
             lowmeans = lowmeans[:-1]
     
@@ -658,22 +692,26 @@ def plot_hexRampByPrwd(hexData,stHex=15,ylim=[-.14,.45]):
     plt.fill_between(xvals,toplt+np.flip(sem(lowmeans)),toplt-np.flip(sem(lowmeans)),color='darkgreen',alpha=0.5)
     plt.xticks(xvals)
     plt.grid(visible=True,lw=.5)
-    plt.ylabel("DA (z-scored)",fontsize=20)
+    plt.ylabel(f"{var}",fontsize=20)
     plt.xlabel("Distance to port (hexes)",fontsize=20)
     #plt.title("high traces = "+str(len(highmeans))+"\nmid traces = "+str(len(midmeans))+"\nlow traces = "+str(len(lowmeans)))
     plt.legend()
     plt.ylim(ylim)
     plt.tight_layout()
     return fig
-    #fig.savefig(hexData.directory_prefix+"hexRampByPrwd2ndHalf.pdf")
 
-def plot_hexRamp(hexData,stHex=14,rampcolor='darkred'):
+def plot_hexRamp(hexData,stHex=14,rampcolor='k',ylim=[-.17,0.47]):
     tracemeans = []
+    velTracemeans = []
     for r in hexData.df.rat.unique():
         tracemeans.append(hexData.df.loc[(hexData.df.rat==r),["DA","hexesFromPort"]].\
             groupby("hexesFromPort").mean().loc[0:stHex,"DA"].values)
         if len(tracemeans[-1]) == 0:
             tracemeans = tracemeans[:-1]
+        velTracemeans.append(hexData.df.loc[(hexData.df.rat==r),["vel","hexesFromPort"]].\
+            groupby("hexesFromPort").mean().loc[0:stHex,"vel"].values)
+        if len(tracemeans[-1]) == 0:
+            velTracemeans = tracemeans[:-1]
     
     xvals = np.arange(-stHex,1)
     fig = plt.figure(figsize=(6,3.7))
@@ -685,10 +723,17 @@ def plot_hexRamp(hexData,stHex=14,rampcolor='darkred'):
     plt.xticks(xvals[::3])
     plt.ylabel("DA (z-scored)",fontsize=20)
     plt.xlabel("Distance to port (hexes)",fontsize=20)
-    plt.ylim(-0.13,0.42)
+    plt.ylim(ylim)
+    ax = plt.gca()
+    ax1 = ax.twinx()
+    toplt = np.flip(np.mean(velTracemeans,axis=0))
+    ax1.plot(xvals,toplt,color='grey',lw=2,ls='--',label='vel')
+    #ax1.fill_between(xvals,toplt+np.flip(sem(velTracemeans)),\
+    #     toplt-np.flip(sem(velTracemeans)),color='k',alpha=0.5)
+    ax1.set_ylabel("speed (cm/s)",fontsize=20)
     plt.tight_layout()
+    plt.legend()
     return fig
-    #fig.savefig(hexData.directory_prefix+"/hexRamp.pdf")
 
 def calcValRegByRatAndSesh(photrats):
     ratpRwdRegs = {r:[] for r in photrats.df.loc[:,"rat"].unique()}
@@ -718,6 +763,36 @@ def calcValLagRegWeights(photrats,dat,pRwds):
         modRwd = LR(fit_intercept=True,normalize=False).fit(X,y)
         rweights[:,n] = modRwd.coef_
     return rweights
+
+def plot_distOfPeakRwdEffect(hexData,hbin):
+    regWeights = calcDaRhistRegInSpace(hexData,hexbin=hbin,rwdsBack=[1,5],alongPath=True)
+    fig = plotDaRhistRegInSpce(hexData,regWeights,hexbin=hbin,rwdsBack=[1,5],alongPath=True)
+    fig.savefig(hexData.directory_prefix+f"/rHistRegWeightsInSpaceSamePath_{hbin}hexBin_mapDists.pdf")
+    
+    xvals=['R(t-1)','R(t-2)','R(t-3)','R(t-4)','R(t-5)']
+    fig = plt.figure(figsize=(5,7))
+    plt.bar(xvals,np.mean(np.argmax(regWeights,axis=1),axis=0)*hbin,alpha=.5,color='maroon')
+    plt.errorbar(xvals,np.mean(np.argmax(regWeights,axis=1)*hbin,axis=0),\
+                 yerr=sem(np.argmax(regWeights,axis=1)*hbin,axis=0),fmt='o',color='k')
+    plt.ylabel("Distance of peak effect on DA (hexes)",fontsize=20)
+    plt.xlabel("Prior reward at port",fontsize=20)
+    plt.tight_layout()
+    fig.savefig(hexData.directory_prefix+f"/distOfPeakRwdEffect_{hbin}hexBin_mapDists.pdf")
+    
+    cors = []
+    for r in range(hexData.df.loc[hexData.df.rat.notnull(),"rat"].unique().shape[0]):
+        cors.append(spearmanr(np.arange(1,6),np.argmax(regWeights,axis=1)[r])[0])
+        
+    fig = plt.figure(figsize=(3,6))
+    plt.bar(0,np.mean(cors),color='k',alpha=0.5)
+    sns.stripplot(np.zeros(hexData.df.loc[hexData.df.rat.notnull(),"rat"].unique().shape[0]),\
+                  cors,size=15,marker='D',color='maroon',jitter=1)
+    plt.ylabel("correlation coefficient")
+    plt.xlabel("DA vs prior reward")
+    plt.xticks([])
+    plt.title("p = "+str(wilcoxon(cors,np.zeros(hexData.df.loc[hexData.df.rat.notnull(),"rat"].unique().shape[0]))[1]))
+    plt.tight_layout()
+    fig.savefig(hexData.directory_prefix+f"distOfPeakRwdEffect_CorPlot_{hbin}hexBin_mapDists.pdf")
 
 def plot_ratMeans(xvals,ratDict,pltColor='darkred',pltLabel="",plot_ratTraces=False):
     ratmeans = []
@@ -814,6 +889,30 @@ def get_rampslopesByRatAndSesh(photrats,stHex=16):
             ratNs[rat].append(len(dat.loc[dat.port!=-100,:]))
     return ratSlopes,ratNs
 
+def get_rampslopesByRatSeshAndHem(photrats,stHex=16):
+    ratSlopes_bar = {r:{fl:[] for fl in photrats.seshInfo.loc[(photrats.seshInfo.rat==r),'fiberloc'].unique()} for r in photrats.df.loc[:,"rat"].unique()}
+    ratNs_bar = {r:[] for r in photrats.df.loc[:,"rat"].unique()}
+    ratSlopes_prob = {r:{fl:[] for fl in photrats.seshInfo.loc[(photrats.seshInfo.rat==r),'fiberloc'].unique()} for r in photrats.df.loc[:,"rat"].unique()}
+    ratNs_prob = {r:[] for r in photrats.df.loc[:,"rat"].unique()}
+    ratSlopes_all = {r:{fl:[] for fl in photrats.seshInfo.loc[(photrats.seshInfo.rat==r),'fiberloc'].unique()} for r in photrats.df.loc[:,"rat"].unique()}
+    for r in tqdm(range(len(photrats.df.loc[:,"rat"].unique()))):
+        rat = photrats.df.loc[:,"rat"].unique()[r]
+        for s in photrats.df.loc[(photrats.df.rat==rat)&(photrats.df.session_type=="barrier"),"session"].unique():
+            dat = photrats.df.loc[(photrats.df.session==s),:]
+            floc = photrats.seshInfo.loc[photrats.seshInfo.session==s,"fiberloc"].values[0]
+            ratSlopes_bar[rat][floc].append(calc_rampSlopes(photrats,dat,stHex))
+            ratNs_bar[rat].append(len(dat.loc[dat.port!=-100,:]))
+        for s in photrats.df.loc[(photrats.df.rat==rat)&(photrats.df.session_type=="prob"),"session"].unique():
+            dat = photrats.df.loc[(photrats.df.session==s),:]
+            floc = photrats.seshInfo.loc[photrats.seshInfo.session==s,"fiberloc"].values[0]
+            ratSlopes_prob[rat][floc].append(calc_rampSlopes(photrats,dat,stHex))
+            ratNs_prob[rat].append(len(dat.loc[dat.port!=-100,:]))
+        for s in photrats.df.loc[(photrats.df.rat==rat),"session"].unique():
+            dat = photrats.df.loc[(photrats.df.session==s),:]
+            floc = photrats.seshInfo.loc[photrats.seshInfo.session==s,"fiberloc"].values[0]
+            ratSlopes_all[rat][floc].append(calc_rampSlopes(photrats,dat,stHex))
+    return ratSlopes_all,ratSlopes_bar,ratNs_bar,ratSlopes_prob,ratNs_prob
+
 def plot_ratMeans_box4EachRat(ratDict,pltColor='darkred'):
     '''Plots distribution of session values for each rat in ratDict
     in form of box plot.'''
@@ -837,7 +936,27 @@ def plot_ratMeans_box4EachRat(ratDict,pltColor='darkred'):
             plt.text(x=r-.25, y=ratDF.max().max()+ratDF.std().max()/1.5, 
                 s='ns',fontweight='bold',fontsize='x-large')
             
-    #plt.xticks(plt.gca().get_xticks(),photrats.df.rat.unique())#np.arange(1,ratDF.shape[1]+1))
+def plot_ratMeans_box4EachRat_byHem(ratDictall,ratDictbar,ratDictprob,pltColor='darkred'):
+    '''Plots distribution of session values for each rat in ratDict
+    in form of box plot.'''
+    ratDF = pd.DataFrame({ key:pd.Series(value) for key, value in ratDictall.items() })
+    ratDFbar = pd.DataFrame({ key:pd.Series(value) for key, value in ratDictbar.items() })
+    ratDFprob = pd.DataFrame({ key:pd.Series(value) for key, value in ratDictprob.items() })
+    sns.barplot(data=ratDF.loc['NAcc-Core-Left ',],color="#1f77b4",ci=None,alpha=0.4)
+    for rat in ratDFbar.columns:
+        if not np.any(np.isnan(ratDFbar.loc['NAcc-Core-Left ',rat])):
+            plt.scatter(np.tile(rat,len(ratDFbar.loc['NAcc-Core-Left ',rat])),\
+                        ratDFbar.loc['NAcc-Core-Left ',rat],color="#1f77b4",marker='X',s=40,edgecolor='k',lw=1)
+        plt.scatter(np.tile(rat,len(ratDFbar.loc['NAcc-Core-Right',rat])),\
+                    ratDFbar.loc['NAcc-Core-Right',rat],color="#ff7f0e",marker='X',s=40,edgecolor='k',lw=1)
+    for rat in ratDFprob.columns:
+        if not np.any(np.isnan(ratDFprob.loc['NAcc-Core-Left ',rat])):
+            plt.scatter(np.tile(rat,len(ratDFprob.loc['NAcc-Core-Left ',rat])),\
+                        ratDFprob.loc['NAcc-Core-Left ',rat],color="#1f77b4",marker='o',s=25,edgecolor='k',lw=1)
+        plt.scatter(np.tile(rat,len(ratDFprob.loc['NAcc-Core-Right',rat])),\
+                    ratDFprob.loc['NAcc-Core-Right',rat],color="#ff7f0e",marker='o',s=25,edgecolor='k',lw=1)
+    sns.barplot(data=ratDF.loc['NAcc-Core-Right',],color="#ff7f0e",ci=None,alpha=0.4)
+    plt.axhline(0,ls=':',color='k')
 
 def get_sigRats(ratDict):
     rat95Errors = []
@@ -879,17 +998,17 @@ def createSegmentLevelDf(hexData):
         segDf.loc[:,segDf.columns[c]] = segDf.loc[:,segDf.columns[c]].astype(dtype4col[c])  
 
 def calcChosVotherVlastRegWeights(hexData,hexbin=1):
-    rDf = hexData.df.loc[(hexData.df.hexesFromPort>0),
+    rDf = hexData.df.loc[(hexData.df.hexesFromPort>=0),
     ['DA','port', 'rwd', 'session', 'block', 'trial', 'rat',
        'date', 'session_type', 'nom_rwd_chosen',
-       'pairedHexState', 'hexesFromCp', 'postCP', 'hexesFromFirstCp',
+       'pairedHexState', 
                 'tri', 'hexesFromPort', 'rt-1',
        'samePath_t-1','otherPort_rt-1', 'lastRwd']]
     rDf = rDf.loc[(rDf.notnull().all(axis=1)),:]
     
     reg_weights = []
     pvalues = []
-    distbins = [np.arange(i,i+hexbin) for i in np.arange(1,16,hexbin)]
+    distbins = [np.arange(i,i+hexbin) for i in np.arange(0,15,hexbin)]
     for r in hexData.df.rat.unique():
         regDf = rDf.loc[(rDf.rat==r),:]
         if len(regDf)==0:
