@@ -3,10 +3,8 @@ __email__ = "krausz.tim@gmail.com"
 __status__ = "development"
 __license__ = "MIT"
 
-#TODO: CREATE MIXIN CLASS WITH FUNCTIONS USED ACROSS MANY CLASSES, ONCE THIS IS BROKEN UP
-# INTO MULTIPLE
 
-from phot_funcs import *
+from single_rat_da import *
 
 class BarChanges(Photrat):
 

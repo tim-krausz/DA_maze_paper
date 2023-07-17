@@ -1,3 +1,12 @@
+'''functions to estimate q values for each port/path based
+on parameters optimized in Julia to fit choice behavior.
+'''
+
+__author__ = "Tim Krausz"
+__email__ = "krausz.tim@gmail.com"
+__status__ = "development"
+__license__ = "MIT"
+
 from scipy.special import erf
 from scipy.stats import logistic
 import numpy as np

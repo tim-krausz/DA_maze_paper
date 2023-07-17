@@ -3,10 +3,8 @@ __email__ = "krausz.tim@gmail.com"
 __status__ = "development"
 __license__ = "MIT"
 
-#TODO: CREATE MIXIN CLASS WITH FUNCTIONS USED ACROSS MANY CLASSES, ONCE THIS IS BROKEN UP
-# INTO MULTIPLE
 
-from phot_funcs import *
+from single_rat_da import *
 from math import log as mlog
 
 class TmatOperations(Photrat):
@@ -36,14 +34,7 @@ class TmatOperations(Photrat):
     def load_tmats(self):
         self.sesh_tmats = {s:[] for s in self.df.session.unique()}
         for sesh in self.df.session.unique():
-            if sesh<=77:
-                self.attempt_loadTmats(sesh)
-            else:
-                print('briefly switching directory_prefix to new Nas...')
-                self.directory_prefix = '/Volumes/Tim/Photometry/'
-                self.attempt_loadTmats(sesh)
-                self.directory_prefix = self.phot_directory_prefix
-                print("directory_prefix back to nas 8")
+            self.attempt_loadTmats(sesh)
 
     def attempt_loadTmats(self,sesh):
         rat = self.df.loc[self.df.session==sesh,'rat'].unique()[0]

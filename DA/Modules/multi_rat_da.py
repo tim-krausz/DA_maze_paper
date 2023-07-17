@@ -5,8 +5,6 @@ __email__ = "krausz.tim@gmail.com"
 __status__ = "development"
 __license__ = "MIT"
 
-#TODO: CREATE MIXIN CLASS WITH FUNCTIONS USED ACROSS MANY CLASSES, ONCE THIS IS BROKEN UP
-# INTO MULTIPLE
 
 from single_rat_da import *
 from portVal import *
@@ -130,7 +128,6 @@ class PhotRats(Photrat,TmatOperations,BarChanges,PortValAnalyses):
         except:
             raise Exception("Must define dataframe before executing function")
     
-
     def convertDfHexlabelsToPairedState(self):
         self.df.loc[:,'pairedHexStates'] = -1
         seshs = self.df.session.unique()
@@ -167,78 +164,6 @@ class PhotRats(Photrat,TmatOperations,BarChanges,PortValAnalyses):
             bardf = centdf.drop(self.sesh_barIDs[sesh]+1,axis=0)
         ax.scatter(bardf[0].values,bardf[1].values,marker='H',color='grey',\
             edgecolors= "darkgrey",alpha=0.4,s=sz)
-
-
-    def chunk_all(self):
-        rwd = []
-        unrwd = []
-        for i in self.dat_visinds:
-            tritrace = self.dat.loc[i+self.fs*self.plot_window[0]:i+self.plot_window[1]\
-            *self.fs,self.plot_trace]
-            bline = 0 #if self.plot_trace=='vel' else self.dat.loc[i+self.fs*self.plot_window[0],self.plot_trace]
-            if len(tritrace)<self.fs*self.plot_window[1]-self.fs*self.plot_window[0]:
-                continue
-            if self.dat.loc[i,'rwd'] == 1:
-                rwd.append(np.subtract(self.dat.loc[i+self.fs*self.plot_window[0]:\
-                    i+self.plot_window[1]*self.fs,self.plot_trace],bline))
-            elif self.dat.loc[i,'rwd'] == 0 or self.dat.loc[i,'rwd'] == -1:
-                unrwd.append(np.subtract(self.dat.loc[i+self.fs*self.plot_window[0]:\
-                    i+self.plot_window[1]*self.fs,self.plot_trace],bline))
-        return np.array(rwd).astype(np.float16),np.array(unrwd).astype(np.float16)
-
-    def plt_all(self): 
-        tr = self.plot_trace
-        torwd,toom = [],[]
-        for s in self.df.session.unique():
-            if self.plotFirstHalfBlock:
-                self.dat = self.df.loc[(self.df.session==s)&(self.df.tri<30)]
-            elif self.plotSecondHalfBlock:
-                self.dat = self.df.loc[(self.df.session==s)&(self.df.tri>30)]
-            else:
-                self.dat = self.df.loc[self.df.session==s]
-            self.dat_visinds = self.dat.loc[self.dat.port!=-100].index
-            tor,too = self.chunk_all()
-            torwd.append(np.nanmean(tor,axis=0))
-            toom.append(np.nanmean(too,axis=0))
-        toall = np.vstack([torwd,toom])
-        xvals = np.linspace(self.fs*self.plot_window[0],self.fs*self.plot_window[1],len(torwd[0]))/self.fs
-        plt.suptitle('Port Approach. '+str(len(self.visinds))+' trials.\n'+\
-                    str(len(self.df.session.unique()))+' sessions.',\
-                     fontsize='xx-large',fontweight='bold')
-        ax1 = plt.subplot(1,1,1)
-        self.plot_trace='vel'
-        vr,vu = self.chunk_all()
-        v = np.vstack([vr,vu])
-        if self.pltvel==True:
-            ax2 = ax1.twinx()
-            ax2.plot(xvals,np.mean(vr,axis=0),alpha=0.6,color='green')
-            ax2.plot(xvals[-self.plot_window[0]*self.fs:],np.mean(vu,axis=0)\
-                [-self.plot_window[0]*self.fs:],linestyle='--',alpha=0.6,color='green')
-            ax2.set_ylabel('velocity',fontsize='x-large',fontweight='bold',color='green')
-            #ax2.legend()
-        ax1.set_ylabel('dF/F',fontsize='x-large',fontweight='bold')
-        ax1.plot(xvals[:-self.plot_window[0]*self.fs],np.nanmean(toall,axis=0)\
-            [:-self.plot_window[0]*self.fs],color='darkgreen')
-        ax1.fill_between(xvals[:-self.plot_window[0]*self.fs],np.nanmean(toall,axis=0)\
-            [:-self.plot_window[0]*self.fs]-sem(toall)[:-self.plot_window[0]*self.fs],\
-            np.nanmean(toall,axis=0)[:-self.plot_window[0]*self.fs]+sem(toall)\
-            [:-self.plot_window[0]*self.fs],color='grey',alpha=0.5)
-        ax1.plot(xvals[-self.plot_window[0]*self.fs:],np.nanmean(torwd,axis=0)\
-            [-self.plot_window[0]*self.fs:],color='darkgreen',label='rwd')
-        ax1.fill_between(xvals[-self.plot_window[0]*self.fs:],np.nanmean(torwd,axis=0)\
-            [-self.plot_window[0]*self.fs:]-sem(torwd)[-self.plot_window[0]*self.fs:],\
-            np.nanmean(torwd,axis=0)[-self.plot_window[0]*self.fs:]+sem(torwd)\
-            [-self.plot_window[0]*self.fs:],color='grey',alpha=0.5)
-        ax1.plot(xvals[-self.plot_window[0]*self.fs:],np.nanmean(toom,axis=0)\
-            [-self.plot_window[0]*self.fs:],color='darkgreen',ls=':'\
-                 ,label='omission')
-        ax1.fill_between(xvals[-self.plot_window[0]*self.fs:],np.nanmean(toom,axis=0)\
-            [-self.plot_window[0]*self.fs:]-sem(toom)[-self.plot_window[0]*self.fs:],\
-            np.nanmean(toom,axis=0)[-self.plot_window[0]*self.fs:]+sem(toom)\
-            [-self.plot_window[0]*self.fs:],color='grey',alpha=0.5)
-        ax1.set_xlabel('time (s) from port entry')
-        ax1.axvline(x=0.0,ymin=-.1,ymax=1.0,color='k',linestyle='--')
-        ax1.legend()
 
     def getTriIndsByTerc(self,rwdtype=None):
         if rwdtype=='rwd':
