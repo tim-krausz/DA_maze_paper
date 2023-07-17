@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """Functions to analyze and vizualize hex-level photometry data.
 TODO: create combined photometry rat child class and add functions as methods."""
 

@@ -215,3 +215,9 @@ function qlikh(params,data)
 
     return -lik
 end
+
+#nested likelihood functions 
+qlikmb = (x,data) -> qlikh([x[1];x[2];x[2];x[3:end]],data)
+qlikmf = (x,data) -> qlikh([x[1];x[2];-1e20;x[3:end]],data)
+
+qliknull = (x,data) -> qlikh([0;0;0;x],data)

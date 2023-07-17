@@ -4,7 +4,7 @@ __status__ = "development"
 __license__ = "MIT"
 
 
-from phot_funcs import *
+from single_rat_da import *
 
 class BarChanges(Photrat):
 
