@@ -236,6 +236,7 @@ def calc_DaChangeVprobCors(photrats):
     for rat in photrats.df.rat.unique():
         photrats.dat = photrats.df.loc[(photrats.df.rat==rat)\
                                        &(photrats.df.tri>25)&(photrats.df.rwd==1),]
+        photrats.dat_visinds = photrats.dat.loc[photrats.dat.port!=-100].index
         lowInds,midInds,highInds = photrats.getTriIndsByTerc()
         daChanges = np.concatenate([calc_DaChangeAtIndsOneRat(photrats,highInds,peak=True),
                      calc_DaChangeAtIndsOneRat(photrats,midInds,peak=True),
@@ -357,6 +358,26 @@ def calcRpeLagRegWeightsBinned(photrats,dat,pRwdRpes,rwds,binsize=50):
         rweightsOm[:,n] = modOm.coef_
     return rweightsRwd,rweightsOm
 
+def plot_rpeLagRegCoefs(photrats,binsize=100):
+    xvals = np.arange(0,photrats.fs*2,250/(1000/binsize))/photrats.fs#np.arange(0,photrats.fs*2)/photrats.fs
+    fig = plt.figure(figsize=(4.5,5))
+    ax1 = plt.subplot2grid((6,4),(2,0),colspan = 4, rowspan =4)
+    plot_ratMeans(xvals,ratRwdRpes,'darkred',pltLabel="reward")
+    plot_ratMeans(xvals,ratOmRpes,'darkblue',pltLabel="omission")
+    plt.xlabel("time from port entry (s)",fontsize='xx-large')
+    plt.axhline(0,ls=':',color='k')
+    plt.ylabel("RPE ß",fontsize='xx-large')
+    plt.xlim(0,2)
+    plt.legend()
+    ax2 = plt.subplot2grid((6,4),(0,0),colspan = 4, rowspan =2,sharex=ax1)
+    plot_sigPoints(xvals,ratRwdRpes,'darkred',plot99=False)
+    plot_sigPoints(xvals,ratOmRpes,'darkblue',plot99=False)
+    ax2.tick_params('x', labelbottom=False)
+    plt.ylabel("Fraction\nsignificant")
+    ax2.set_ylim(0,1)
+    plt.tight_layout()
+    fig.savefig(photrats.directory_prefix+"rpeLagReg_binned.pdf")
+
 def plot_ratMeans(xvals,ratDict,pltColor='darkred',pltLabel=""):
     ratmeans = []
     for rat in ratDict:
@@ -409,6 +430,42 @@ def removeErrantBlock1Assignments(photrats):
     photrats.df.drop(index=photrats.df.index.max(),axis=0,inplace=True)
     photrats.df.reset_index(inplace=True)
     photrats.get_visinds()
+
+def get_newPathTracesByDistToPort(adjHexIndsSortedByDist):
+    smoothWin = int(photrats.fs/4)
+    shortTrace = []
+    midTrace = []
+    longTrace = []
+    terc_cutoff = int(len(adjHexIndsSortedByDist)/3)
+    for i in range(len(adjHexIndsSortedByDist)):
+        adjInd = adjHexIndsSortedByDist[i]
+        trace = photrats.df.loc[adjInd+photrats.plot_window[0]*photrats.fs:\
+                            adjInd+photrats.plot_window[1]*photrats.fs,photrats.plot_trace].rolling(smoothWin).mean().values
+        if i<=terc_cutoff:
+            shortTrace.append(trace)
+        elif i<=terc_cutoff*2:
+            midTrace.append(trace)
+        else:
+            longTrace.append(trace)
+    return shortTrace,midTrace,longTrace
+
+def get_newPathTracesByDistToPort_absoluteDist(newHexAdjInds,distsToPort,dist_cutoff=7):
+    smoothWin = int(photrats.fs/4)
+    shortTrace = []
+    midTrace = []
+    longTrace = []
+    for i in range(len(newHexAdjInds)):
+        adjInd = newHexAdjInds[i]
+        dist = distsToPort[i]
+        trace = photrats.df.loc[adjInd+photrats.plot_window[0]*photrats.fs:\
+                adjInd+photrats.plot_window[1]*photrats.fs,photrats.plot_trace].rolling(smoothWin).mean().values
+        if dist<=dist_cutoff:
+            shortTrace.append(trace)
+        elif dist<=dist_cutoff*2:
+            midTrace.append(trace)
+        else:
+            longTrace.append(trace)
+    return shortTrace,midTrace,longTrace
 
 def find_newHexAdjInds(photrats):
     newHexAdjInds = []
@@ -507,6 +564,22 @@ def plotFirstEntryHexChangeMeanOverRats(photrats,availratmeans,blockedratmeans,l
     plt.tight_layout()
     return fig
 
+def calc_DaPeakIndividualDiffsAfterNewPathInds(photrats,indices):
+    photrats.set_plot_window([-1,0.25])
+    tracePeakRats = photrats.df.loc[indices,"rat"].astype(str).values
+    tracePeakChanges = []
+    missingInds = []
+    for rat in photrats.df.rat.unique():
+        if rat not in tracePeakRats:
+            missingInds.append(np.where(photrats.df.rat.unique()==rat)[0][0])
+            continue
+        tracesPost = get_TracesAroundIndex(photrats,indices[tracePeakRats==rat])
+        bline = tracesPost[:,0]#np.mean(tracesPost,axis=0)[0]
+        #tracePost = np.mean(tracesPost,axis=0)[photrats.fs*1:]
+        daChanges = np.max(tracesPost[:,photrats.fs*1:],axis=1)-bline
+        tracePeakChanges += list(daChanges)
+    return tracePeakChanges
+
 def calc_DaPeakDiffAfterNewPathInds(photrats,indices):
     photrats.set_plot_window([-1,0.25])
     tracePeakRats = photrats.df.loc[indices,"rat"].astype(str).values
@@ -523,20 +596,6 @@ def calc_DaPeakDiffAfterNewPathInds(photrats,indices):
         tracePeakRatMeans.append(np.mean(daChanges))#max(tracePost)-bline)
     return tracePeakRatMeans,missingInds
 
-def plot_ratTracesAtHexChangeDiscovery(photrats,inds,pltCol='k'):
-    '''Plot individual rat averages at discovery of newly available and newly blocked paths.
-    Return average of rat average traces.'''
-    xvals = np.arange(photrats.plot_window[0]*photrats.fs,photrats.plot_window[1]*photrats.fs+1)/photrats.fs
-    fig = plt.figure()
-    tracePeakRats = photrats.df.loc[inds,"rat"].astype(str).values
-    ratmeans,n_PerRat = get_ratTracesAtHexChangeDiscovery(photrats,xvals,inds)
-    plt.plot(xvals,np.mean(ratmeans,axis=0),color=pltCol)
-    plt.ylim(-1.5,4.9)
-    plt.ylabel("mean DA")
-    plt.xlabel("time from port entry (s)")
-    plt.tight_layout()
-    return fig,ratmeans,n_PerRat
-
 def get_ratTracesAtHexChangeDiscovery(photrats,xvals,indices,plotTraces=True):
     tracePeakRats = photrats.df.loc[indices,"rat"].astype(str).values
     ratmeans = []
@@ -545,14 +604,28 @@ def get_ratTracesAtHexChangeDiscovery(photrats,xvals,indices,plotTraces=True):
         tracesPost = get_TracesAroundIndex(photrats,indices[tracePeakRats==rat])
         tracePost = np.mean(tracesPost,axis=0)
         n_PerRat[rat] = len(tracesPost)
-        if len(tracesPost)>0:
+        if len(tracesPost)>=3:
             ratmeans.append(tracePost)
             if plotTraces:
                 plt.plot(xvals,tracePost,color='k',alpha=0.3,lw=1)
     return ratmeans,n_PerRat
 
-def plotFirstEntryHexChange(photrats,adjHexInds,blockedHexAdjInds,legend_on=False):
-    #photrats.set_plot_trace("green_z_scored")
+def plot_ratTracesAtHexChangeDiscovery(photrats,inds,pltCol='k'):
+    '''Plot individual rat averages at discovery of newly available and newly blocked paths.
+    Return average of rat average traces.'''
+    xvals = np.arange(photrats.plot_window[0]*photrats.fs,\
+        photrats.plot_window[1]*photrats.fs+1)/photrats.fs
+    fig = plt.figure()
+    tracePeakRats = photrats.df.loc[inds,"rat"].astype(str).values
+    ratmeans,n_PerRat = get_ratTracesAtHexChangeDiscovery(photrats,xvals,inds)
+    plt.plot(xvals,np.mean(ratmeans,axis=0),color=pltCol)
+    #plt.ylim(-1.5,4.9)
+    plt.ylabel("mean DA")
+    plt.xlabel("time from port entry (s)")
+    plt.tight_layout()
+    return fig,ratmeans,n_PerRat
+
+def plot_FirstEntryHexChange(photrats,adjHexInds,blockedHexAdjInds,legend_on=False):
     photrats.set_plot_window([-5,5])
     smoothWin = int(photrats.fs/4)
     fig = plt.figure(figsize=(7,5))#(4.8,5))
@@ -560,7 +633,6 @@ def plotFirstEntryHexChange(photrats,adjHexInds,blockedHexAdjInds,legend_on=Fals
     
     avail_traces,blocked_traces = get_availAndBlockedTraces(photrats,adjHexInds,blockedHexAdjInds)
     
-    #toplt = pd.Series(np.median(avail_traces,axis=0)).rolling(smoothWin).mean().values
     toplt = pd.Series(np.mean(avail_traces,axis=0)).rolling(smoothWin).mean().values
     topltSem = pd.Series(sem(avail_traces,axis=0)).rolling(smoothWin).mean().values
     plt.plot(xvals,toplt,label="Newly available",color='deeppink',lw=3)
@@ -570,26 +642,24 @@ def plotFirstEntryHexChange(photrats,adjHexInds,blockedHexAdjInds,legend_on=Fals
     plt.plot(xvals,toplt,label="Newly blocked",color='k',ls=':',lw=3)
     plt.fill_between(xvals,toplt-topltSem,toplt+topltSem,color='k',ls=':',alpha=.3)
     plt.xlabel("time from hex entry (s)",fontsize="xx-large")
-    #plt.ylabel("median z-scored DA",fontsize="xx-large"")
     plt.ylabel("Mean z-scored DA",fontsize="xx-large")
     plt.axvline(x=0,ls='--',color='k',alpha=.8,lw=1)
     plt.xticks(np.arange(-5,6))
-    plt.ylim([-.4,1.3])
     if legend_on:
         plt.legend()
     plt.tight_layout()
+    return figayout()
     return fig
 
-def plotFirstAdjEntryByEnteredVsIgnored(photrats,enteredInds,ignoredInds,legend_on=False,pltCol1='deeppink',pltCol2='k',ls2='-'):
-    #photrats.set_plot_trace("green_z_scored")
+def plot_FirstAdjEntryByEnteredVsIgnored(photrats,enteredInds,ignoredInds,legend_on=False,pltCol1='deeppink',pltCol2='k',ls2='-'):
+    photrats.set_plot_trace("green_z_scored")
     photrats.set_plot_window([-5,5])
-    smoothWin = int(photrats.fs/10)
+    smoothWin = int(photrats.fs/4)
     fig = plt.figure(figsize=(7,5))
     xvals = np.arange(photrats.plot_window[0]*photrats.fs,photrats.plot_window[1]*photrats.fs+1)/photrats.fs
     
     avail_traces,blocked_traces = get_availAndBlockedTraces(photrats,enteredInds,ignoredInds)
     
-    #toplt = pd.Series(np.median(avail_traces,axis=0)).rolling(smoothWin).mean().values
     toplt = pd.Series(np.mean(avail_traces,axis=0)).rolling(smoothWin).mean().values
     topltSem = pd.Series(sem(avail_traces,axis=0)).rolling(smoothWin).mean().values
     plt.plot(xvals,toplt,label="entered",color=pltCol1,lw=3)
@@ -668,13 +738,15 @@ def plot_meanRatDaChangeAfterHexEntry(photrats,adjHexInds,blockedHexAdjInds,pltC
             plt.plot([0,1],[np.mean(availMeans[r]),np.mean(blockedMeans[r])],color='k',alpha=0.5,lw=1)
         except:
             continue
+    #for r in [np.mean(rm) for rm in blockedRatMeans]:
+    #    plt.scatter(x=1,y=np.mean(r),color=pltCol2,marker='o')
     print("blocked hex: ")
     sigBlocked = get_sigRats_fromMeanList(blockedMeans)
     print("avail hex: ")
     sigAvail = get_sigRats_fromMeanList(availMeans)
     #missingInd = [i for i in range(len(blockedRatMeans)) if len(blockedRatMeans[i])==0]
     if len(missingInd)>0:
-        [availMeans.pop(i) for i in missingInd]
+        availMeans = np.delete(availMeans,missingInd)
     print("paired test")
     sigPaired = get_sigRatsPaired_from2samples(availMeans,blockedMeans,"greater")
     plot_sigMarkers(sigPaired,0.5,2.4)
