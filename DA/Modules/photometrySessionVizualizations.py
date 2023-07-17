@@ -5,6 +5,9 @@ __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"
 __status__ = "development"
 
+import matplotlib.colors as mc
+from scipy.stats import gaussian_kde
+from scipy.ndimage import gaussian_filter
 from __main__ import *
 
 hexlist = [2,47,46,45,44,43,3,\
@@ -53,7 +56,7 @@ centdf = centdf.T
 def plot_hex_outline(barriers):
     bardf = centdf.drop(barriers,axis=0)
     plt.scatter(bardf.loc[:,0].values,bardf.loc[:,1].values,c=\
-            'darkgrey',marker='H',s=1000,edgecolors="k",alpha=.9,lw=2)
+            'darkgrey',marker='H',s=1000,edgecolors="k",alpha=1,lw=2)
 
 def plot_hex_barriers(barriers):
     plt.scatter(centdf.loc[barriers,0].values,centdf.loc[barriers,1].values,c=\
@@ -129,61 +132,75 @@ def plot_sesh_pathChoices_ticks(dat,blocks=[],startrows=0):
     plt.tight_layout()
 
 def plot_posOverlayAndTickPlot(photrats,s,blks = [1,2],
-        posColor='cyan',saveFig=True,secondHalf=False,
-        edgCol='k', plotOverlay=True,plotProbs=True):
+        posColor='cyan',saveFig=True,secondHalf=False,plot_ticks=False,
+        edgCol='k', plotOverlay=True,plotProbs=True,trans=0.2,density=False,vmax=60,vmin=5):
     dat = photrats.df.loc[photrats.df.session==s].copy()
     halfString = '_only2ndHalfBlkPos' if secondHalf else ''
-    fig = plt.figure(figsize=(16,9.3))
+    densString = "_density" if density else ""
+    fig = plt.figure(figsize=(15.5,9))
     startrows = 10
-    plot_sesh_pathChoices_ticks(dat,blocks=blks,startrows=startrows)
+    if plot_ticks:
+        plot_sesh_pathChoices_ticks(dat,blocks=blks,startrows=startrows)
     plt.subplots_adjust(wspace=0, hspace=0,top=0.95)
-    #plt.figure(figsize=(17.4,6))
-    for blk in blks:#dat.block.unique():
+    for blk in blks:
         prwds = dat.loc[dat.block==blk,["nom_rwd_a","nom_rwd_b",\
         "nom_rwd_c"]].values[0].astype(int)
         if dat.session_type.values[0] == "barrier":
             bars = np.add(photrats.sesh_barIDs[s][blk-1],1)
         else:
             bars = np.add(photrats.sesh_barIDs[s],1)
-        
-        #fig,ax = plt.subplots(figsize=(5.6,5.5))#figsize=(7.5,5))
-        ax = plt.subplot2grid((6+startrows,len(blks)*10),(0,(blk-1)*10),\
+        ax = plt.subplot2grid((6+startrows,len(blks)*10),(0,(blk-np.min(blks))*10),\
             colspan = 8, rowspan =startrows)
-        #ax = plt.subplot(1,3,blk-np.min(blks)+1)
-        plot_hex_outline(bars)
-        plot_hex_barriers(bars)
-        plt.ylim(0,522)
-        plt.xlim(55,590)
-        ax = plt.gca()
-        ax.invert_yaxis()
-        plt.tight_layout()
-        plt.xticks([])
-        plt.yticks([])
-        minTri = 25 if secondHalf else 0
+        minTri = 25 if secondHalf else 0 
         if plotOverlay:
-            plt.scatter(dat.loc[(dat.block==blk)&(dat.tri>minTri),'x'].values,\
-                        dat.loc[(dat.block==blk)&(dat.tri>minTri),'y'].values,\
-                        alpha=0.2,color=posColor,s=20,edgecolors=edgCol,lw=2)#"darkviolet")#"salmon")#"fuchsia"
+            x = dat.loc[(dat.block==blk)&(dat.tri>minTri)&(dat.x.notnull()),'x'].values
+            y = dat.loc[(dat.block==blk)&(dat.tri>minTri)&(dat.x.notnull()),'y'].values
+            if density:
+                H, xedges, yedges = np.histogram2d(x,y,bins=40)
+                X, Y = np.meshgrid(xedges, yedges)
+                plt.pcolormesh(X,Y,H.T,cmap="Greys",norm=mc.Normalize(vmin=vmin,vmax=vmax))
+                plot_hex_outline(bars)
+                plot_hex_barriers(bars)
+                plt.ylim(0,522)
+                plt.xlim(55,590)
+                ax = plt.gca()
+                ax.invert_yaxis()
+                plt.tight_layout()
+                plt.xticks([])
+                plt.yticks([])
+            else:
+                plot_hex_outline(bars)
+                plot_hex_barriers(bars)
+                plt.ylim(0,522)
+                plt.xlim(55,590)
+                ax = plt.gca()
+                ax.invert_yaxis()
+                plt.tight_layout()
+                plt.xticks([])
+                plt.yticks([])
+                xy = np.vstack([x,y])
+                z = gaussian_kde(xy)(xy)
+                plt.scatter(x,y,c=z,s=20,cmap="viridis")
+
         if plotProbs:
             plt.text(x=300,y=0,s=str(prwds[0])+"%",fontsize=30,\
-                fontweight='bold',backgroundcolor="k",color="white")#backgroundcolor="darkblue",color="white")
+                fontweight='bold',backgroundcolor="k",color="white")
             plt.text(x=30,y=470,s=str(prwds[1])+"%",fontsize=30,\
-                fontweight='bold',backgroundcolor="k",color="white")#backgroundcolor="darkorange",color="white")
+                fontweight='bold',backgroundcolor="k",color="white")
             plt.text(x=570,y=470,s=str(prwds[2])+"%",fontsize=30,\
-                fontweight='bold',backgroundcolor="k",color="white")#backgroundcolor="darkgreen",color="white")
+                fontweight='bold',backgroundcolor="k",color="white")
         plt.axis("off")
     if saveFig:
         fig.savefig(photrats.directory_prefix+"sesh"+\
-            str(s)+"blocks"+str(blks)+"positionOverlayPlot"+str(halfString)+".pdf")
+            str(s)+"blocks"+str(blks)+"positionOverlayPlot"+halfString+densString+".pdf")
         fig.savefig(photrats.directory_prefix+"sesh"+\
-            str(s)+"blocks"+str(blks)+"positionOverlayPlot"+str(halfString)+".png")
-
+            str(s)+"blocks"+str(blks)+"positionOverlayPlot"+halfString+densString+".png")
 def plot_10tri_posOverlay(photrats,s,blks = [1,2],
-        posColor='cyan',saveFig=True,secondTen=False,
+        posColor='cyan',saveFig=True,groupOfTen=1,
         edgCol='k', plotOverlay=True,plotProbs=True):
     dat = photrats.df.loc[photrats.df.session==s].copy()
-    halfString = 'second_10' if secondTen else 'first_10'
-    fig = plt.figure(figsize=(16,9.3))
+    triString = str(groupOfTen)
+    fig = plt.figure(figsize=(15.5,9))
     startrows = 10
     plt.subplots_adjust(wspace=0, hspace=0,top=0.95)
     #plt.figure(figsize=(17.4,6))
@@ -195,10 +212,8 @@ def plot_10tri_posOverlay(photrats,s,blks = [1,2],
         else:
             bars = np.add(photrats.sesh_barIDs[s],1)
         
-        #fig,ax = plt.subplots(figsize=(5.6,5.5))#figsize=(7.5,5))
-        ax = plt.subplot2grid((6+startrows,len(blks)*10),(0,(blk-1)*10),\
+        ax = plt.subplot2grid((6+startrows,len(blks)*10),(0,(blk-np.min(blks))*10),\
             colspan = 8, rowspan =startrows)
-        #ax = plt.subplot(1,3,blk-np.min(blks)+1)
         plot_hex_outline(bars)
         plot_hex_barriers(bars)
         plt.ylim(0,522)
@@ -208,25 +223,27 @@ def plot_10tri_posOverlay(photrats,s,blks = [1,2],
         plt.tight_layout()
         plt.xticks([])
         plt.yticks([])
-        minTri = 10 if secondTen else 0
-        maxTri = 20 if secondTen else 10
+        minTri = (groupOfTen-1)*10
+        maxTri = groupOfTen*10
         if plotOverlay:
-            plt.scatter(dat.loc[(dat.block==blk)&(dat.tri>minTri)&(dat.tri<=maxTri),'x'].values,\
-                        dat.loc[(dat.block==blk)&(dat.tri>minTri)&(dat.tri<=maxTri),'y'].values,\
-                        alpha=0.4,color=posColor,s=20,edgecolors=edgCol,lw=2)#"darkviolet")#"salmon")#"fuchsia"
+            x = dat.loc[(dat.block==blk)&(dat.tri>minTri)&(dat.x.notnull()),'x'].values
+            y = dat.loc[(dat.block==blk)&(dat.tri>minTri)&(dat.x.notnull()),'y'].values
+            xy = np.vstack([x,y])
+            z = gaussian_kde(xy)(xy)
+            plt.scatter(x,y,c=z,s=20,cmap="viridis")
         if plotProbs:
             plt.text(x=300,y=0,s=str(prwds[0])+"%",fontsize=30,\
-                fontweight='bold',backgroundcolor="k",color="white")#backgroundcolor="darkblue",color="white")
+                fontweight='bold',backgroundcolor="k",color="white")
             plt.text(x=30,y=470,s=str(prwds[1])+"%",fontsize=30,\
-                fontweight='bold',backgroundcolor="k",color="white")#backgroundcolor="darkorange",color="white")
+                fontweight='bold',backgroundcolor="k",color="white")
             plt.text(x=570,y=470,s=str(prwds[2])+"%",fontsize=30,\
-                fontweight='bold',backgroundcolor="k",color="white")#backgroundcolor="darkgreen",color="white")
+                fontweight='bold',backgroundcolor="k",color="white")
         plt.axis("off")
     if saveFig:
         fig.savefig(photrats.directory_prefix+"sesh"+\
-            str(s)+"blocks"+str(blks)+"positionOverlayPlot"+str(halfString)+".pdf")
+            str(s)+"blocks"+str(blks)+"positionOverlayPlot"+str(triString)+"_10tris.pdf")
         fig.savefig(photrats.directory_prefix+"sesh"+\
-            str(s)+"blocks"+str(blks)+"positionOverlayPlot"+str(halfString)+".png")
+            str(s)+"blocks"+str(blks)+"positionOverlayPlot"+str(triString)+"_10tris.png")
 
 def plot_individualSeshTrace_RwdAndNewHexLabeled(photrats,s,
     plot_newlyAvail=False,plot_ref=False):
