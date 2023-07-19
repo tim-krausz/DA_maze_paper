@@ -12,7 +12,7 @@ from bar_changes import *
 from tmat_ops import *
 from tqdm import tqdm
 
-class PhotRats(Photrat,TmatOperations,BarChanges,PortValAnalyses):
+class PhotRats(TmatOperations,BarChanges,PortValAnalyses,Photrat):
 
     cols2load = ['green_z_scored',"ref",'port','rwd','x','y','nom_rwd_a','nom_rwd_b',\
               'beamA', 'beamB', 'beamC','vel','acc','tri','block',\

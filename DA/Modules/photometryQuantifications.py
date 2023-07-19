@@ -65,17 +65,6 @@ def plot_portAlignedDaInTime(photrats,secondHalfOnly=True,
     plt.tight_layout()
     return fig
 
-def write_dict_to_file(my_dict, file_path):
-    """
-    Writes a dictionary to a text file at the specified file path.
-
-    Parameters:
-    my_dict (dict): The dictionary to write to the file.
-    file_path (str): The path to the file to write to.
-    """
-    with open(file_path, 'w') as f:
-        for key, value in my_dict.items():
-            f.write(f'{key}: {value}\n')
 
 def plot_portAlignedDaInTime_byQ(photrats):
     photrats.set_pool_factor("Q_chosen")
