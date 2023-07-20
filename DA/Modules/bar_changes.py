@@ -1,5 +1,5 @@
-"""Object to a
-"""
+"""Object to analyze data around barrier changes in
+the maze from Krausz et al."""
 
 __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"
@@ -37,8 +37,6 @@ class BarChanges(Photrat):
 
     def find_newlyBlockedHexes(self):
         for s in self.sesh_newlyBlockedHexes:
-            #if len(self.sesh_tmats[s])==1:
-            #    continue
             for b in range(len(self.sesh_tmats[s])-1):
                 testmat = self.sesh_tmats[s][b]
                 testmat1 = self.sesh_tmats[s][b+1]
@@ -49,8 +47,6 @@ class BarChanges(Photrat):
         self.df.loc[:,"newlyAvailHex"]=0
         self.df.loc[:,"newlyAvailHex"] = self.df.loc[:,"newlyAvailHex"].astype("int8")
         for s in self.sesh_newlyAvailHexes:
-            #if len(self.sesh_newlyAvailHexes[s])==1:
-            #    continue
             for b in range(len(self.sesh_newlyAvailHexes[s])):
                 newHex = self.sesh_newlyAvailHexes[s][b]
                 dat = self.df.loc[(self.df.session==s)&(self.df.block==b+2)]
