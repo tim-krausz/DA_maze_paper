@@ -118,7 +118,7 @@ def get_hexRampRatFiberDict(hexData,stHex=10):
                 &(hexData.df.port!=-100),])][:stHex]
 
 def plot_individualRatRamps(hexData):
-    get_hexRampRatDict(hexData,stHex=16)
+    calc_hexRampRatDict(hexData,stHex=16)
     fig = plt.figure(figsize=(5,4))
     xvals = np.arange(-15,1)
     for rat in hexData.ratRamps.keys():
