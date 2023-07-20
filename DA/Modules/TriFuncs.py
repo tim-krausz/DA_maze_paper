@@ -1,3 +1,4 @@
+"""Assortment of functions to help with Krausz et al. Maze analyses."""
 
 __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"
@@ -6,21 +7,24 @@ __license__ = "MIT"
 
 import math
 import numpy as np
-from shapely.geometry import Point,MultiPoint,Polygon,MultiPolygon
-import shapely.vectorized
 import pandas as pd
 from matplotlib import pyplot as plt
 import statsmodels.api as sm
-from shapely.ops import transform
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+scale = StandardScaler()
+from statsmodels.discrete.discrete_model import Logit
 
 fs = 250
 
 def find_nearest(array,value):
     idx = np.searchsorted(array, value, side="left")
-    if idx > 0 and (idx == len(array) or math.fabs(value - array[idx-1]) < math.fabs(value - array[idx])):
+    if idx > 0 and (idx == len(array) or math.fabs(value - array[idx-1]) \
+        < math.fabs(value - array[idx])):
         return array[idx-1]
     else:
         return array[idx]
+
 def closestlong(array,value):
     return(array[np.abs(np.subtract(array,value)).argmin()])
 
@@ -51,57 +55,6 @@ def naninterp(B):
     A[np.isnan(A)] = np.interp(x, xp, fp)
     return(A)
 
-def define_hexbins(drawnlines):
-    '''Return polygon collection object for each drawn hexbin in drawnlines'''
-    #add all polygon objects to multipolygon object called polybins
-    polys = [Polygon(h) for h in drawnlines]
-    polybins = MultiPolygon(polys)
-    return polybins
-
-def in_approach(apzone,data):
-    '''Return binary vector where 1 indicates rat is inside of the drawn and defined
-    approach zone (apzone). data should be photometry dataframe'''
-    zone = Polygon(apzone)
-    xvec = data.x.values
-    yvec = data.y.values
-    inzone = shapely.vectorized.contains(zone,xvec,yvec)
-    return inzone.astype(int)
-
-def inpoly(point):
-    '''Return poly bin index (identifier) and centroid array (for plotting)'''
-    try: polybins
-    except NameError: 'polybins not defined'
-    #iterate through polygon objects, checking if point is in one of them
-    ind = None
-    for p in range(len(polybins)):
-        if point.within(polybins[p]):
-            ind = p
-    return ind,np.array(polybins[ind].centroid)
-
-def get_nearest_hex(point,centroids):
-    '''return hexID whose centroid is the shortest distance from point'''
-    dists = []
-    for c in centroids:
-        dists.append(point.distance(Point(c[0])))
-    if np.min(dists) < 50:
-        return centroids[np.argmin(dists)][1]
-    else:
-        return np.nan
-
-def point_to_poly(points,polybins,centroids):
-    '''given MultiPoint object (points) and MultiPolygon object (polybins),
-    return array of bin IDs whose indices correspond to point identities. Also
-    returns centroid arrays for each element in binIDs.'''
-    xvec = np.array(points)[:,0]
-    yvec = np.array(points)[:,1]
-    binID = np.tile(np.nan,len(xvec))
-    hex_centers = np.tile(np.nan,(len(xvec),2))
-    for h in range(len(polybins)):
-        inhex = shapely.vectorized.contains(polybins[h],xvec,yvec)
-        binID[np.where(inhex==True)]=h
-        hex_centers[np.where(inhex==True)]=np.array(polybins[h].centroid)
-    return binID,hex_centers
-
 def make_lr(ports):
     '''returns list of left-right choices for each trial. 0 is right, 1 is left'''
     lr = [2]
@@ -116,10 +69,6 @@ def make_lr(ports):
             lr.append(1)
     return lr
 
-
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScaler
-scale = StandardScaler()
 def ramptest(data,visnum):
     y = np.array(data.iloc[visinds[visnum]-time[0]*250:visinds[visnum]])
     x = np.linspace(0,len(y),len(y))#column vector with x values. linspace(0,Fs*6,Fs*6)
@@ -473,7 +422,6 @@ def est_leakint_rr_tri(data,ports,tau=0,optimize=True):
         cor = spearmanr([rr,tt],axis=1,nan_policy='omit')[0]
     return rr,corr,tau
 
-from statsmodels.discrete.discrete_model import Logit
 def choice_reg(factors,data):
     y = data.loc[visinds,'lrchoice']
     X = data.loc[visinds,factors]
