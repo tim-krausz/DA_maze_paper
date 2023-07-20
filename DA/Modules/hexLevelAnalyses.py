@@ -1291,11 +1291,11 @@ def plot_DAdifSameValt(hexData,ratSameValtPreCpDA):
     for rat in ratSameValtPreCpDA:
         ratmeans_samePath.append(np.mean(ratSameValtPreCpDA[rat]["DARwdVsOmSame"]))
         ratmeans_altPath.append(np.mean(ratSameValtPreCpDA[rat]["DARwdVsOmAlt"]))
-        plt.scatter(x=["Same\nPath", "Alternative\nPath"],
+        plt.scatter(x=["Same\nPath", "Alternative\nPath"],\
             y=[ratmeans_samePath[-1],ratmeans_altPath[-1]],color='k',s=30,marker='D',alpha=1)
-    sns.barplot(x=["Same\nPath", "Alternative\nPath"],
-        y=[np.mean(ratmeans_samePath),np.mean(ratmeans_altPath)],
-        palette=["#2ca02c","#ff7f0e"],alpha=.5)
+    sns.barplot(x=["Same\nPath", "Alternative\nPath"],\
+        y=[np.mean(ratmeans_samePath),np.mean(ratmeans_altPath)],\
+        palette=["#ff7f0e","#2ca02c"],alpha=.5)
     plt.ylabel("$\Delta$ DA before\nchoice point",fontsize=20)
     plt.suptitle("DA change on next run\nfollowing reward - omission",fontsize='xx-large')
     plt.tight_layout()
