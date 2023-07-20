@@ -1,4 +1,5 @@
-""""""
+"""Object to aggregate and analyze photometry maze
+ data across sessions and rats"""
 
 __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"

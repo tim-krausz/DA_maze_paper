@@ -56,7 +56,7 @@ def plot_arrowMap(arrowdf,arrowvals,mapToUse=valcols):
         visited.append(str(arrowdf.loc[i,["from_state","to_state"]].values))
         cind +=1
 
-def plot_pairedStateValsVsDA(s,b,t,plot_pos=False):
+def plot_pairedStateValsVsDA(s,b,t,onlyPointing2port=False):
     portz = ['A','B','C']
     plt.clf()
     trial = vrats.valDaDf.loc[(vrats.valDaDf.session==s)&(vrats.valDaDf.block==b)\
@@ -66,10 +66,13 @@ def plot_pairedStateValsVsDA(s,b,t,plot_pos=False):
     fromp = vrats.df.loc[(vrats.df.session==s)&(vrats.df.block==b)&\
                                 (vrats.df.tri==t-1),"port"].values[0]
     toPort = portz[nextp]
-    if len(vrats.sesh_arrows2goal['to'+toPort][s])==126:
-        arrows2include = np.where(vrats.sesh_arrows2goal['to'+toPort][s])[0]
+    if onlyPointing2port:
+        if len(vrats.sesh_arrows2goal['to'+toPort][s])==126:
+            arrows2include = np.where(vrats.sesh_arrows2goal['to'+toPort][s])[0]
+        else:
+            arrows2include = np.where(vrats.sesh_arrows2goal['to'+toPort][s][b-1])[0]
     else:
-        arrows2include = np.where(vrats.sesh_arrows2goal['to'+toPort][s][b-1])[0]
+        arrows2include = np.arange(126)
     meanHexDa = vrats.valDaDf.loc[(vrats.valDaDf.session==s)&\
                  (vrats.valDaDf.block==b)&(vrats.valDaDf.tri==t)&\
                   (vrats.valDaDf.pairedHexState.isin(arrows2include)),:].groupby(\
@@ -82,13 +85,13 @@ def plot_pairedStateValsVsDA(s,b,t,plot_pos=False):
     
     statelist = meanHexDa.index.values
     stateDa = meanHexDa.values
-    plt.subplot(131)
+    plt.subplot(121)
     plt.title("value map")
     plot_hex_outline(vrats,sesh=s,block=b,ax=plt.gca(),size='sm')
     plot_arrowMapFromStates(statelist,statevals.values)
     plt.axis("off")
     
-    plt.subplot(132)
+    plt.subplot(122)
     plt.title("DA")
     plot_hex_outline(vrats,sesh=s,block=b,ax=plt.gca(),size='sm')
     plot_arrowMapFromStates(statelist,stateDa,plotDA=True)
@@ -96,19 +99,6 @@ def plot_pairedStateValsVsDA(s,b,t,plot_pos=False):
                                 (vrats.df.tri==t)&(vrats.df.block==b)&\
                                 (vrats.df.port!=-100),"nom_rwd_chosen"].values[0])
     plt.axis("off")
-    
-    if plot_pos:
-        plt.subplot(133)
-        if b>1:
-            t-=1
-        plt.scatter(photrats.df.loc[(photrats.df.session==s)&(photrats.df.block==b)
-                                   &(photrats.df.tri==t),'x'],photrats.df.loc[
-            (photrats.df.session==s)&(photrats.df.block==b)&(photrats.df.tri==t),'y'],c=
-                   photrats.df.loc[(photrats.df.session==s)&(photrats.df.block==b)
-                                   &(photrats.df.tri==t),'green_z_scored'],cmap='viridis',s=50)
-        plt.xlim(50,600)
-        plt.ylim(0,500)
-        plt.gca().invert_yaxis()
 
 class ValIterRats(PhotRats):
     

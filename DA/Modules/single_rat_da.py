@@ -5,6 +5,7 @@ Also includes code for hex and paired direction-hex state transition matrices"""
 __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"
 __status__ = "development"
+__license__ = "MIT"
 
 import numpy as np
 import pandas as pd
@@ -344,9 +345,6 @@ class Photrat():
 
     def show_tri_heatmap(self,heatbool):
         self.plot_heat = heatbool
-
-    def convert_vel2cms(self):
-        self.df.vel = self.df.vel*60/3.14
 
     def add_bars(self,bars):
         self.bars = bars

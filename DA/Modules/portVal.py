@@ -1,3 +1,5 @@
+"""Object to help with port-value analysis"""
+
 __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"
 __status__ = "development"
@@ -167,9 +169,6 @@ class PortValAnalyses(Photrat):
         seshs=df.session.unique()
         for s in range(len(seshs)):
             sdf = df.loc[(df.session==seshs[s])]
-            #sdf['rhist_a'] = self.tri_rr(sdf,[0],t=20).fillna(0)
-            #sdf['rhist_b'] = self.tri_rr(sdf,[1],t=20).fillna(0)
-            #sdf['rhist_c'] = self.tri_rr(sdf,[2],t=20).fillna(0)
             rdf = pd.DataFrame({'rdif':self.get_lr_dif_val(sdf,'nom_rwd'),\
                 'ldif':self.get_lr_dif_val(sdf,'dist')})
             rdf['rhist_dif'] = get_lr_dif_val(sdf,'rhist')
