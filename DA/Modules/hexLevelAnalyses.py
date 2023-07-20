@@ -77,7 +77,7 @@ def add_hexesFromPort2Df(hexData):
     hexData.df.loc[:,"hexesFromPort"] = hexData.df.loc[:,"hexesFromPort"]*-1
     #hexData.df.loc[hexData.df.hexlabel.isin([1,2,3]),"hexesFromPort"]=0
 
-def get_hexRampRatDict(hexData,stHex=10):
+def calc_hexRampRatDict(hexData,stHex=10):
     try:
         hexData.df.loc[:,"hexesFromPort"]
     except:
@@ -1253,6 +1253,36 @@ def create_sameValtPreCpDARatMeans(hexData):
             dat.loc[(dat["rt-1"]==0)&(dat["samePath_t-1"]==0),"DA"].mean()
     return ratSameValtPreCpDA
 
+
+def plot_rampSequenceRatAvg(hexData,rPat=[0,1],altPath=False,alongPath=False)
+    alphaVal = 0.05
+    entriesByRat = np.zeros((len(rPat),9,16))
+    totEntries = 0
+    for r in range(len(hexData.df.loc[:,"rat"].unique())):
+        rat = hexData.df.loc[:,"rat"].unique()[r]
+        entries = get_entriesByRwdSeq(hexData.df.loc[hexData.df.rat==rat,:],\
+                                      rwd_pattern=rPat,alongPath=alongPath,altPath=altPath,getPriorTri=False)
+        totEntries += np.shape(entries)[1]
+        entriesByRat[:,r,:] = np.mean(entries,axis=1)
+    fig = plot_traceByRwdSeq(rPat,entriesByRat,pltError=True,fsize=[6.5,5],ylim=[-.197,.51])
+    entryDifs = calcDifInTracesByRwdSeq(entriesByRat)
+    if rPat[-1]>0:
+        sigInds = np.arange(-15,1)[calcSigDifVs0Vector_usingWSR(entryDifs[0].T,greater=True)<alphaVal]
+    else:
+        sigInds = np.arange(-15,1)[calcSigDifVs0Vector_usingWSR(entryDifs[0].T,less=True)<alphaVal]
+    for i in sigInds:
+        plt.text(x=i-.1, y=0.35, s='*',fontweight='bold',fontsize='x-large')
+    if altPath:
+        pathSpecString = "altPathOnly"
+    elif alongPath:
+        pathSpecString = "samePathOnly"
+    else:
+        pathSpecString = "anyPath"
+    plt.suptitle(str(rPat)+" sequence averaged over rats\n"+pathSpecString+"; n = "+str(totEntries)+" events")
+    plt.tight_layout()
+    plt.subplots_adjust(hspace=0.0)
+    print(f"n = {totEntries}")
+    return fig
 
 def plot_DAdifSameValt(hexData,ratSameValtPreCpDA):
     fig = plt.figure(figsize=(4.5,5))

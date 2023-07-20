@@ -1,3 +1,5 @@
+"""Object with methods for transition matrix operations"""
+
 __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"
 __status__ = "development"
@@ -193,7 +195,7 @@ class TmatOperations(Photrat):
                         togoal = self.find_arrows2goal(dmap,p)
                         self.sesh_arrows2goal["to"+portStrs[p]][s].append(togoal)
 
-    def compute_distanceToPort(self,data,port,getDistsFromDeadEnds=False):
+    def compute_distanceToPort(self,data,port):
         actions = [0,1]
         distmap = np.full(126,0,dtype="float16")
         portz = [phexdf.loc[phexdf.to_state==1,'statecodes'].values[0],
@@ -220,18 +222,6 @@ class TmatOperations(Photrat):
                 break
             oldD = newD
             i += 1
-        if getDistsFromDeadEnds:
-            return self.addSisterDistsToDistmap(distmap)
-        return distmap
-
-    def addSisterDistsToDistmap(self,distmap):
-        '''this needs some test cases and debugging'''
-        for sCode in range(len(distmap)):
-            stateHexPair = phexdf.loc[phexdf.statecodes==sCode,["from_state","to_state"]].values[0]
-            sisterState = phexdf.loc[(phexdf.from_state==stateHexPair[1])&\
-                    (phexdf.to_state==stateHexPair[0]),"statecodes"].values[0]
-            if np.isnan(distmap[sisterState]):
-                distmap[sisterState] = distmap[sCode]
         return distmap
 
     def find_arrows2goal(self,distmap,port):
@@ -240,9 +230,6 @@ class TmatOperations(Photrat):
             options = list(arrowdf.loc[arrowdf.from_state==i,"statecodes"].values)
             if all(np.isnan(distmap[options])):
                 continue
-            #if np.all(np.logical_not(np.isnan(distmap[options]))==
-            #    np.logical_not(np.isnan(distmap[options]))[0]):
-            #    continue
             #get state with shortest distance from port
             minarrow = np.nanargmin(distmap[options])
             onlyshort = options[minarrow]

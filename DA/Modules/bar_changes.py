@@ -1,3 +1,6 @@
+"""Object to a
+"""
+
 __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"
 __status__ = "development"

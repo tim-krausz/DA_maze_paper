@@ -11,7 +11,6 @@ import shapely.vectorized
 import pandas as pd
 from matplotlib import pyplot as plt
 import statsmodels.api as sm
-#import pyproj
 from shapely.ops import transform
 
 fs = 250
