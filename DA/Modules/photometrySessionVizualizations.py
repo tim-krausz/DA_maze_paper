@@ -195,6 +195,7 @@ def plot_posOverlayAndTickPlot(photrats,s,blks = [1,2],
             str(s)+"blocks"+str(blks)+"positionOverlayPlot"+halfString+densString+".pdf")
         fig.savefig(photrats.directory_prefix+"sesh"+\
             str(s)+"blocks"+str(blks)+"positionOverlayPlot"+halfString+densString+".png")
+
 def plot_10tri_posOverlay(photrats,s,blks = [1,2],
         posColor='cyan',saveFig=True,groupOfTen=1,
         edgCol='k', plotOverlay=True,plotProbs=True):

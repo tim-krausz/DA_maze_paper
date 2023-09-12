@@ -2,7 +2,7 @@
 
 __author__ = "Tim Krausz"
 __email__ = "krausz.tim@gmail.com"
-__status__ = "development"
+__status__ = "ready for publication"
 __license__ = "MIT"
 
 
